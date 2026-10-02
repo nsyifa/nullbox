@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE tickets SET severity = ?, status = ?, assignee_name = ?, updated_at = ?, closed_at = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "2a70a9e3883b2370d21d72626f905d8229d7741c930fb556afe93d85df700e39"
+}

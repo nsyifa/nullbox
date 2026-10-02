@@ -1,0 +1,48 @@
+.celebration {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  overflow: hidden;
+}
+.confetti {
+  position: absolute;
+  top: -2rem;
+  left: var(--x);
+  width: 0.6rem;
+  height: 1rem;
+  background: hsl(calc(var(--i) * 47) 90% 60%);
+  animation: fall calc(2s + var(--i) * 40ms) ease-in forwards;
+  animation-delay: calc(var(--i) * 30ms);
+}
+.banner {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  font-size: clamp(2rem, 8vw, 5rem);
+  font-weight: 900;
+  color: var(--color-accent);
+  text-shadow: 0 4px 0 var(--color-shadow);
+  white-space: nowrap;
+  animation: pop 600ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes fall {
+  to {
+    transform: translateY(110vh) rotate(720deg);
+  }
+}
+@keyframes pop {
+  from {
+    transform: translate(-50%, -50%) scale(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
+  .banner {
+    animation: none;
+  }
+}

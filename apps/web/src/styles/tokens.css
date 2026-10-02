@@ -1,0 +1,85 @@
+/* Design tokens. Every color, size and font lives here. */
+:root {
+  color-scheme: light;
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.6rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 3rem;
+
+  --radius: 0.5rem;
+  --radius-lg: 0.9rem;
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.15);
+
+  --color-bg: #f6f5fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #eceaf5;
+  --color-border: #dcd8ea;
+  --color-text: #1d1a2b;
+  --color-muted: #6a6582;
+  --color-accent: #6d4aff;
+  --color-accent-bg: #efeaff;
+  --color-note-bg: #fff6d6;
+  --color-danger: #c9264b;
+  --color-danger-bg: #ffe6ec;
+  --color-shadow: rgb(29 26 43 / 0.15);
+
+  --status-open: #d7f5e3;
+  --status-progress: #dbe8ff;
+  --status-waiting: #fff0c2;
+  --status-resolved: #ece3ff;
+  --status-closed: #4b4560;
+
+  --sev-p1: #e0303f;
+  --sev-p2: #ffb4a8;
+  --sev-p3: #ffe3a3;
+  --sev-p4: #dde4ea;
+
+  --aging-yellow: #fdf6dc;
+  --aging-stone: #e6e1d6;
+
+  --beast-body: #8fd694;
+  --beast-angry: #f4a259;
+  --beast-kaiju: #6a3fb5;
+  --beast-ink: #1d1a2b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-bg: #15131f;
+    --color-surface: #1f1c2c;
+    --color-surface-2: #2b2740;
+    --color-border: #39334f;
+    --color-text: #ece9f7;
+    --color-muted: #a49fbd;
+    --color-accent: #8f73ff;
+    --color-accent-bg: #2c2550;
+    --color-note-bg: #3b3420;
+    --color-danger: #ff6b8a;
+    --color-danger-bg: #3d1a24;
+    --color-shadow: rgb(0 0 0 / 0.4);
+    --status-open: #1f4a33;
+    --status-progress: #233a63;
+    --status-waiting: #5a4a17;
+    --status-resolved: #3c2f6b;
+    --status-closed: #0c0a12;
+    --sev-p2: #7a3a30;
+    --sev-p3: #6a5420;
+    --sev-p4: #3a4048;
+    --aging-yellow: #2e2a1a;
+    --aging-stone: #2a2722;
+  }
+}

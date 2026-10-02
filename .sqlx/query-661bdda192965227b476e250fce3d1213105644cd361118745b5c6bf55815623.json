@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO tickets (id, number, subject, body, severity, status, customer_name, customer_email,\n                                   anon_animal, anon_number, access_token_hash, created_at, updated_at)\n               VALUES (?, (SELECT COALESCE(MAX(number), 0) + 1 FROM tickets), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n               RETURNING number",
+  "describe": {
+    "columns": [
+      {
+        "name": "number",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tickets",
+            "name": "number"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "661bdda192965227b476e250fce3d1213105644cd361118745b5c6bf55815623"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"open_count!: i64\", MIN(created_at) AS \"oldest: DateTime<Utc>\"\n               FROM tickets WHERE status IN (SELECT value FROM json_each(?))",
+  "describe": {
+    "columns": [
+      {
+        "name": "open_count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "oldest: DateTime<Utc>",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "1dc5b12e8de0cbc9e1f672d6a014997ccf687bc6fa16447f20d28f051b618e1e"
+}
