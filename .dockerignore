@@ -1,0 +1,11 @@
+# Keep build output, local data and secrets out of the Docker build context.
+.git
+target
+**/node_modules
+**/dist
+**/.env
+**/.env.local
+*.db
+*.db-shm
+*.db-wal
+.devcontainer
