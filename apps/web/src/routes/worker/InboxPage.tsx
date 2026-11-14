@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState, useSyncExternalStore } from "react";
 import { Link } from "react-router";
+import { getWorkerToken, setWorkerToken, subscribeActor } from "../../api/actor";
+import { ApiError } from "../../api/client";
 import type { TicketStatus } from "../../api/generated/TicketStatus";
 import { useBacklogStats, useInbox } from "../../api/queries";
 import { agingLevel } from "../../components/aging";
@@ -26,6 +29,17 @@ export function InboxPage() {
   const [toast, setToast] = useState<string | null>(null);
   const inbox = useInbox(status);
   const stats = useBacklogStats();
+  const token = useSyncExternalStore(subscribeActor, getWorkerToken);
+  const rejected = inbox.error instanceof ApiError && inbox.error.status === 401;
+
+  if (!token || rejected) {
+    return (
+      <section className={styles.page}>
+        <h1>{copy.worker.inboxTitle}</h1>
+        <SignIn rejected={Boolean(token) && rejected} />
+      </section>
+    );
+  }
 
   const tickets = (inbox.data ?? []).filter((ticket) =>
     ticket.subject.toLowerCase().includes(search.trim().toLowerCase()),
@@ -134,5 +148,46 @@ export function InboxPage() {
       <Celebration openCount={stats.data?.open_count} />
       <Toast message={toast} onDone={() => setToast(null)} />
     </section>
+  );
+}
+
+/** Minimal worker sign-in: a token field. The token lives in sessionStorage (see api/actor.ts). */
+function SignIn({ rejected }: { rejected: boolean }) {
+  const copy = useCopy();
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState("");
+  return (
+    <form
+      className={styles.card}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!value.trim()) return;
+        setWorkerToken(value);
+        setValue("");
+        void queryClient.resetQueries();
+      }}
+    >
+      <h2>{copy.worker.signInTitle}</h2>
+      {rejected && (
+        <p className={styles.muted} role="alert">
+          {copy.worker.tokenRejected}
+        </p>
+      )}
+      <p className={styles.muted}>{copy.worker.signInHint}</p>
+      <label className={styles.field}>
+        {copy.worker.tokenLabel}
+        <input
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          required
+        />
+      </label>
+      <div className={styles.row}>
+        <button type="submit">{copy.worker.signIn}</button>
+      </div>
+    </form>
   );
 }

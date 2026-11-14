@@ -1,6 +1,13 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
-import { getActorName, setActorName, subscribeActor } from "../api/actor";
+import {
+  clearWorkerToken,
+  getActorName,
+  getWorkerToken,
+  setActorName,
+  subscribeActor,
+} from "../api/actor";
 import { dictionaries, type Locale, useCopy, useLocale } from "../copy/CopyProvider";
 import { useKonami } from "../hooks/useKonami";
 import styles from "./AppShell.module.css";
@@ -34,6 +41,7 @@ export function AppShell() {
         </nav>
         <div className={styles.tools}>
           {pathname.startsWith("/inbox") && <ActorPicker />}
+          {pathname.startsWith("/inbox") && <SignOut />}
           <LanguageSwitcher />
         </div>
       </header>
@@ -66,7 +74,26 @@ function LanguageSwitcher() {
   );
 }
 
-/** Not a login: the worker just tells us who they are (see api/actor.ts). */
+/** Forgets the worker token for this session and drops cached worker data. */
+function SignOut() {
+  const copy = useCopy();
+  const queryClient = useQueryClient();
+  const token = useSyncExternalStore(subscribeActor, getWorkerToken);
+  if (!token) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        clearWorkerToken();
+        void queryClient.resetQueries();
+      }}
+    >
+      {copy.worker.signOut}
+    </button>
+  );
+}
+
+/** Label for "Assign to me" only; identity comes from the token (see api/actor.ts). */
 function ActorPicker() {
   const copy = useCopy();
   const name = useSyncExternalStore(subscribeActor, getActorName);

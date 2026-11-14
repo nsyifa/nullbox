@@ -9,7 +9,14 @@ use nullbox_api::{AppState, Config, db, http};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
+const WORKER_TOKEN: &str = "synthetic-worker-token";
+const HOT_TOKEN: &str = "synthetic-hot-token";
+
 async fn app() -> Router {
+    app_with_worker_tokens(Some(WORKER_TOKEN), Some(HOT_TOKEN)).await
+}
+
+async fn app_with_worker_tokens(worker: Option<&str>, hot: Option<&str>) -> Router {
     let pool = db::connect_in_memory().await.expect("in-memory db");
     let config = Config {
         bind_addr: "127.0.0.1:0".parse().unwrap(),
@@ -18,6 +25,8 @@ async fn app() -> Router {
         public_web_url: "http://localhost:5173".into(),
         admin_token: "test-admin-token".into(),
         mcp_token: Some(MCP_TOKEN.into()),
+        worker_token: worker.map(str::to_owned),
+        hot_worker_token: hot.map(str::to_owned),
     };
     http::router(AppState::new(pool, config))
 }
@@ -48,7 +57,9 @@ async fn send(
 }
 
 const MCP_TOKEN: &str = "test-mcp-token";
-const WORKER: (&str, &str) = ("x-actor-name", "%E5%B1%B1%E7%94%B0"); // 山田, percent-encoded
+const WORKER: (&str, &str) = ("authorization", "Bearer synthetic-worker-token");
+const HOT: (&str, &str) = ("authorization", "Bearer synthetic-hot-token");
+const FORGED_NAME: (&str, &str) = ("x-actor-name", "%E5%B1%B1%E7%94%B0"); // 山田, percent-encoded
 
 #[tokio::test]
 async fn customer_and_worker_round_trip() {
@@ -118,10 +129,10 @@ async fn customer_and_worker_round_trip() {
             .any(|m| m["system_event"] == json!({ "kind": "status_changed", "from": "resolved", "to": "open" }))
     );
 
-    // The worker view does include the note, written by 山田.
+    // The worker view does include the note, written by the identity behind the token.
     let (_, thread) = send(&app, "GET", &format!("/api/tickets/{id}"), &[WORKER], None).await;
     let note = thread["messages"].as_array().unwrap().iter().find(|m| m["internal"] == true).unwrap();
-    assert_eq!(note["author_name"], "山田");
+    assert_eq!(note["author_name"], "worker");
 }
 
 #[tokio::test]
@@ -254,4 +265,119 @@ async fn mcp_requires_bearer_and_lists_tools() {
     let call = json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "list_tickets", "arguments": {}}});
     let (_, res) = send(&app, "POST", "/mcp", &[auth], Some(call)).await;
     assert_eq!(res["result"]["isError"], false);
+}
+
+/// Every worker route, as (method, path, body). `{id}` is replaced with a real ticket.
+fn worker_routes() -> Vec<(&'static str, &'static str, Option<Value>)> {
+    vec![
+        ("GET", "/api/tickets", None),
+        ("GET", "/api/tickets/{id}", None),
+        ("POST", "/api/tickets/{id}/messages", Some(json!({ "body": "hi" }))),
+        ("PATCH", "/api/tickets/{id}", Some(json!({ "severity": "p2" }))),
+        ("POST", "/api/tickets/{id}/yeet", None),
+        ("GET", "/api/stats/backlog", None),
+    ]
+}
+
+async fn create_ticket(app: &Router) -> (String, String) {
+    let (status, created) =
+        send(app, "POST", "/api/tickets", &[], Some(json!({ "subject": "Locked", "body": "x", "severity": "p3" })))
+            .await;
+    assert_eq!(status, StatusCode::CREATED);
+    (created["ticket"]["id"].as_str().unwrap().to_owned(), created["access_token"].as_str().unwrap().to_owned())
+}
+
+async fn assert_all_worker_routes_denied(app: &Router, id: &str, headers: &[(&str, &str)], case: &str) {
+    for (method, path, body) in worker_routes() {
+        let uri = path.replace("{id}", id);
+        let (status, error) = send(app, method, &uri, headers, body).await;
+        assert_eq!(
+            (status, &error["code"]),
+            (StatusCode::UNAUTHORIZED, &json!("missing_actor")),
+            "{case}: {method} {uri} must be refused"
+        );
+        assert!(!error.to_string().contains("synthetic-"), "{case}: error must not echo a token");
+    }
+}
+
+#[tokio::test]
+async fn worker_routes_refuse_missing_forged_and_bad_credentials() {
+    let app = app().await;
+    let (id, ticket_token) = create_ticket(&app).await;
+
+    assert_all_worker_routes_denied(&app, &id, &[], "no credentials").await;
+    assert_all_worker_routes_denied(&app, &id, &[FORGED_NAME], "X-Actor-Name alone").await;
+    assert_all_worker_routes_denied(&app, &id, &[("authorization", "Bearer made-up-token")], "made-up bearer").await;
+    assert_all_worker_routes_denied(&app, &id, &[("authorization", WORKER_TOKEN)], "token without scheme").await;
+    assert_all_worker_routes_denied(&app, &id, &[("authorization", "Bearer ")], "empty bearer").await;
+    assert_all_worker_routes_denied(&app, &id, &[("x-ticket-token", &ticket_token)], "customer token").await;
+    assert_all_worker_routes_denied(&app, &id, &[("x-admin-token", "test-admin-token")], "admin token").await;
+
+    // The 401 tells the client which scheme to use.
+    let res = app.clone().oneshot(Request::builder().uri("/api/tickets").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(res.headers().get("www-authenticate").unwrap(), "Bearer");
+
+    // Nothing was changed by the refused requests.
+    let (_, thread) = send(&app, "GET", &format!("/api/tickets/{id}"), &[WORKER], None).await;
+    assert_eq!(thread["ticket"]["status"], "open");
+    assert_eq!(thread["ticket"]["severity"], "p3");
+    assert!(thread["messages"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn worker_and_hot_tokens_are_separate_identities() {
+    let app = app().await;
+    let (id, _) = create_ticket(&app).await;
+
+    for (creds, name) in [(WORKER, "worker"), (HOT, "HOT")] {
+        let (status, inbox) = send(&app, "GET", "/api/tickets", &[creds], None).await;
+        assert_eq!(status, StatusCode::OK, "{name} reads the inbox");
+        assert_eq!(inbox.as_array().unwrap().len(), 1);
+
+        // A forged name next to a valid token changes nothing: the token decides.
+        let (status, message) = send(
+            &app,
+            "POST",
+            &format!("/api/tickets/{id}/messages"),
+            &[creds, FORGED_NAME],
+            Some(json!({ "body": format!("reply from {name}") })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{name} replies");
+        assert_eq!(message["author_name"], name);
+
+        let (status, _) = send(&app, "GET", "/api/stats/backlog", &[creds], None).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    let (status, ticket) =
+        send(&app, "PATCH", &format!("/api/tickets/{id}"), &[HOT], Some(json!({ "severity": "p1" }))).await;
+    assert_eq!((status, &ticket["severity"]), (StatusCode::OK, &json!("p1")));
+    let (status, ticket) = send(&app, "POST", &format!("/api/tickets/{id}/yeet"), &[WORKER], None).await;
+    assert_eq!((status, &ticket["status"]), (StatusCode::OK, &json!("resolved")));
+
+    // Lower-case scheme is accepted too.
+    let (status, _) = send(&app, "GET", "/api/tickets", &[("authorization", "bearer synthetic-hot-token")], None).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn worker_access_fails_closed_without_configured_tokens() {
+    let app = app_with_worker_tokens(None, None).await;
+    let (id, ticket_token) = create_ticket(&app).await;
+
+    assert_all_worker_routes_denied(&app, &id, &[WORKER], "worker token, none configured").await;
+    assert_all_worker_routes_denied(&app, &id, &[HOT], "HOT token, none configured").await;
+
+    // Customers are unaffected.
+    let (status, thread) =
+        send(&app, "GET", &format!("/api/public/tickets/{id}"), &[("x-ticket-token", &ticket_token)], None).await;
+    assert_eq!((status, &thread["ticket"]["subject"]), (StatusCode::OK, &json!("Locked")));
+
+    // Only HOT configured: the worker token is refused, HOT works.
+    let app = app_with_worker_tokens(None, Some(HOT_TOKEN)).await;
+    let (status, _) = send(&app, "GET", "/api/tickets", &[WORKER], None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, _) = send(&app, "GET", "/api/tickets", &[HOT], None).await;
+    assert_eq!(status, StatusCode::OK);
 }

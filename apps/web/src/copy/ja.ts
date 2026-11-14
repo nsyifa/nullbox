@@ -102,8 +102,14 @@ const ja = {
     noMatches: "該当なし。怪しい。",
     you: "あなたは",
     actorPlaceholder: "お名前",
-    actorHint:
-      "ログインではありません。誰でも誰にでもなれます。（ログインはアップグレードのひとつです）",
+    actorHint: "「自分に割り当て」の既定名にだけ使います。本人確認は対応者トークンで行います。",
+    signInTitle: "対応者サインイン",
+    signInHint: "対応者トークンを貼り付けてください。このブラウザセッションの間だけ保持します。",
+    tokenLabel: "対応者トークン",
+    signIn: "サインイン",
+    signOut: "サインアウト",
+    tokenRejected:
+      "このトークンは受け付けられませんでした（401）。新しいトークンを入力してください。",
     back: "受信箱に戻る",
     reply: "お客様に返信",
     internalNote: "社内メモ",
@@ -150,7 +156,7 @@ const ja = {
   errors: {
     not_found: "隅々まで探しました。ソファの下まで。ありません。",
     missing_ticket_token: "このページには秘密リンクが必要です。",
-    missing_actor: "まず名前を選んでください（右上）。",
+    missing_actor: "まず対応者トークンでサインインしてください（受信箱ページ）。",
     forbidden: "ここを通すわけにはいかない。",
     validation_failed: "入力内容に問題があるようです。各項目をご確認ください。",
     invalid_status_transition: "そのステータス変更はできません。時は一方向にしか流れません。",

@@ -1,5 +1,6 @@
-//! Worker endpoints. UNPROTECTED in the MVP: `Actor` is an untrusted header and
-//! `policy::can` allows everything. Both are the seams to replace.
+//! Worker endpoints. Every handler takes `Actor`, which requires a valid worker
+//! bearer token (see `extract.rs`). `policy::can` still allows every action to any
+//! signed-in worker.
 
 use axum::Json;
 use axum::extract::State;

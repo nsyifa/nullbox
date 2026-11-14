@@ -3,9 +3,10 @@
  *
  * - Base URL from `VITE_API_BASE_URL`, so the same bundle works behind any
  *   origin (Tauri, a CDN, a different domain). No cookies, no same-origin assumptions.
- * - Auth headers are added in `authHeaders()`: that's where a bearer token goes later.
+ * - Worker auth is `Authorization: Bearer <token>`, added in `authHeaders()`. The token
+ *   comes from the worker's sign-in (see `actor.ts`), never from the build.
  */
-import { getActorName } from "./actor";
+import { getWorkerToken } from "./actor";
 import type { BacklogStats } from "./generated/BacklogStats";
 import type { CreateTicketRequest } from "./generated/CreateTicketRequest";
 import type { CreateTicketResponse } from "./generated/CreateTicketResponse";
@@ -35,10 +36,10 @@ export class ApiError extends Error {
   }
 }
 
-/** Worker identity. Today an untrusted name header; tomorrow `Authorization: Bearer …`. */
+/** Worker credentials. Without a token we send nothing and the API answers 401. */
 function authHeaders(): Record<string, string> {
-  // Percent-encoded so non-ASCII names (e.g. 山田) survive HTTP headers.
-  return { "X-Actor-Name": encodeURIComponent(getActorName()) };
+  const token = getWorkerToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function ticketTokenHeaders(token: string): Record<string, string> {

@@ -1,6 +1,6 @@
 use axum::Json;
 use axum::extract::rejection::{JsonRejection, PathRejection, QueryRejection};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use ts_rs::TS;
@@ -38,7 +38,7 @@ pub enum ApiError {
     NotFound,
     #[error("missing X-Ticket-Token header")]
     MissingTicketToken,
-    #[error("missing or invalid X-Actor-Name header")]
+    #[error("missing or invalid worker credentials (Authorization: Bearer)")]
     MissingActor,
     #[error("forbidden")]
     Forbidden,
@@ -98,7 +98,11 @@ impl IntoResponse for ApiError {
             }
             other => other.to_string(),
         };
-        (self.status(), Json(ErrorBody { code: self.code(), message })).into_response()
+        let mut response = (self.status(), Json(ErrorBody { code: self.code(), message })).into_response();
+        if matches!(self, Self::MissingActor) {
+            response.headers_mut().insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+        }
+        response
     }
 }
 
