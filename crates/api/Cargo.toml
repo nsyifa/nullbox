@@ -26,6 +26,12 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 ts-rs.workspace = true
 uuid.workspace = true
+opentelemetry = "0.33.1"
+opentelemetry_sdk = "0.33.1"
+opentelemetry-http = "0.33.1"
+opentelemetry-appender-tracing = "0.33.1"
+tracing-opentelemetry = "0.34.0"
+opentelemetry-otlp = { version = "0.33.1", features = ["http-proto", "reqwest-blocking-client", "reqwest-rustls", "trace", "logs"] }
 
 [dev-dependencies]
 http-body-util.workspace = true

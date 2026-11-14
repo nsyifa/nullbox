@@ -5,6 +5,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use nullbox_domain::{AnonIdentity, AuthorKind, BeastMood, DomainEvent, Message, SystemEvent, Ticket, TicketStatus};
 use uuid::Uuid;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::dto::{BacklogStats, CreateTicketRequest, TicketThread, UpdateTicketRequest};
 use crate::error::ApiError;
@@ -45,6 +46,7 @@ impl TicketService {
         let anon = customer_name.is_none().then(|| AnonIdentity::from_random(rand::random()));
         let access_token = token::generate().map_err(|e| ApiError::WorksOnMyMachine(e.to_string()))?;
 
+        let subject_for_telemetry = subject.clone();
         let ticket = self
             .repo
             .create_ticket(NewTicket {
@@ -59,6 +61,16 @@ impl TicketService {
                 created_at: Utc::now(),
             })
             .await?;
+
+        // Searchable by the bot's ticket code, on both the span and an exported log record
+        tracing::Span::current().set_attribute("ticket.subject", subject_for_telemetry.clone());
+        tracing::Span::current().set_attribute("ticket.number", ticket.number as i64);
+        tracing::info!(
+            ticket.subject = %subject_for_telemetry,
+            ticket.id = %ticket.id,
+            ticket.number = ticket.number,
+            "ticket created"
+        );
 
         self.events.emit(DomainEvent::TicketCreated {
             ticket_id: ticket.id,
