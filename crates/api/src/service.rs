@@ -187,9 +187,13 @@ impl TicketService {
     }
 
     /// The secret token is the customer's login: without a valid one, every ticket looks missing.
+    /// A token only opens its own ticket; any other ID looks missing too.
     async fn ticket_for_customer(&self, id: Uuid, access_token: &str) -> Result<Ticket, ApiError> {
-        self.repo.get_ticket_by_token(&token::hash(access_token)).await?.ok_or(ApiError::NotFound)?;
-        self.ticket(id).await
+        self.repo
+            .get_ticket_by_token(&token::hash(access_token))
+            .await?
+            .filter(|ticket| ticket.id == id)
+            .ok_or(ApiError::NotFound)
     }
 
     /// Save the ticket with its new messages, then emit events (only once the write succeeded).

@@ -156,3 +156,71 @@ async fn admin_export_needs_the_admin_token() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(tickets[0]["customer_email"], "a@example.com");
 }
+
+#[tokio::test]
+async fn customer_link_only_opens_its_own_ticket() {
+    let app = app().await;
+
+    let mut tickets = Vec::new();
+    for subject in ["Ticket A", "Ticket B"] {
+        let (status, created) =
+            send(&app, "POST", "/api/tickets", &[], Some(json!({ "subject": subject, "body": "x", "severity": "p3" })))
+                .await;
+        assert_eq!(status, StatusCode::CREATED);
+        let id = created["ticket"]["id"].as_str().unwrap().to_owned();
+        let token = created["access_token"].as_str().unwrap().to_owned();
+        tickets.push((id, token));
+    }
+    let [(a_id, a_token), (b_id, b_token)] = <[_; 2]>::try_from(tickets).unwrap();
+    assert_ne!(a_token, b_token);
+
+    let worker_view = |id: String| {
+        let app = app.clone();
+        async move { send(&app, "GET", &format!("/api/tickets/{id}"), &[WORKER], None).await.1 }
+    };
+    let before = (worker_view(a_id.clone()).await, worker_view(b_id.clone()).await);
+
+    // A token with B's ID, and B token with A's ID: both look like a missing ticket.
+    for (token, other_id) in [(&a_token, &b_id), (&b_token, &a_id)] {
+        let (status, error) =
+            send(&app, "GET", &format!("/api/public/tickets/{other_id}"), &[("x-ticket-token", token)], None).await;
+        assert_eq!((status, &error["code"]), (StatusCode::NOT_FOUND, &json!("not_found")));
+
+        let (status, error) = send(
+            &app,
+            "POST",
+            &format!("/api/public/tickets/{other_id}/messages"),
+            &[("x-ticket-token", token)],
+            Some(json!({ "body": "not my ticket" })),
+        )
+        .await;
+        assert_eq!((status, &error["code"]), (StatusCode::NOT_FOUND, &json!("not_found")));
+    }
+
+    // Rejected replies left both tickets untouched.
+    let after = (worker_view(a_id.clone()).await, worker_view(b_id.clone()).await);
+    assert_eq!(before, after);
+
+    // Each link still reads and replies to its own ticket.
+    for (id, token, subject) in [(&a_id, &a_token, "Ticket A"), (&b_id, &b_token, "Ticket B")] {
+        let (status, thread) =
+            send(&app, "GET", &format!("/api/public/tickets/{id}"), &[("x-ticket-token", token)], None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(thread["ticket"]["subject"], subject);
+
+        let (status, _) = send(
+            &app,
+            "POST",
+            &format!("/api/public/tickets/{id}/messages"),
+            &[("x-ticket-token", token)],
+            Some(json!({ "body": format!("reply to {subject}") })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+
+        let thread = worker_view(id.clone()).await;
+        let bodies: Vec<_> = thread["messages"].as_array().unwrap().iter().map(|m| m["body"].clone()).collect();
+        assert!(bodies.contains(&json!(format!("reply to {subject}"))));
+        assert!(!bodies.contains(&json!("not my ticket")));
+    }
+}
