@@ -1,6 +1,9 @@
-import { useCallback, useState, useSyncExternalStore } from "react";
+// import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
-import { getActorName, setActorName, subscribeActor } from "../api/actor";
+// import { getActorName, setActorName, subscribeActor } from "../api/actor";
+import { useNavigate } from "react-router";
+import { api } from "../api/client";
 import { dictionaries, type Locale, useCopy, useLocale } from "../copy/CopyProvider";
 import { useKonami } from "../hooks/useKonami";
 import styles from "./AppShell.module.css";
@@ -9,6 +12,16 @@ import { EnterpriseMode } from "./EnterpriseMode";
 const LANGUAGE_NAMES: Record<Locale, string> = { en: "English", ja: "日本語" };
 
 export function AppShell() {
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    try {
+      await api.logout();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  }
   const copy = useCopy();
   const { pathname } = useLocation();
   const [enterprise, setEnterprise] = useState(false);
@@ -33,7 +46,12 @@ export function AppShell() {
           <NavLink to="/inbox">{copy.app.nav.inbox}</NavLink>
         </nav>
         <div className={styles.tools}>
-          {pathname.startsWith("/inbox") && <ActorPicker />}
+          {/* {pathname.startsWith("/inbox") && <ActorPicker />} */}
+          {pathname.startsWith("/inbox") && (
+        <button type="button" onClick={handleLogout}>
+          Logout
+        </button>
+      )}
           <LanguageSwitcher />
         </div>
       </header>
@@ -67,18 +85,18 @@ function LanguageSwitcher() {
 }
 
 /** Not a login: the worker just tells us who they are (see api/actor.ts). */
-function ActorPicker() {
-  const copy = useCopy();
-  const name = useSyncExternalStore(subscribeActor, getActorName);
-  return (
-    <label className={styles.actor} title={copy.worker.actorHint}>
-      <span>{copy.worker.you}</span>
-      <input
-        value={name}
-        placeholder={copy.worker.actorPlaceholder}
-        maxLength={100}
-        onChange={(event) => setActorName(event.target.value)}
-      />
-    </label>
-  );
-}
+// function ActorPicker() {
+//   const copy = useCopy();
+//   const name = useSyncExternalStore(subscribeActor, getActorName);
+//   return (
+//     <label className={styles.actor} title={copy.worker.actorHint}>
+//       <span>{copy.worker.you}</span>
+//       <input
+//         value={name}
+//         placeholder={copy.worker.actorPlaceholder}
+//         maxLength={100}
+//         onChange={(event) => setActorName(event.target.value)}
+//       />
+//     </label>
+//   );
+// }

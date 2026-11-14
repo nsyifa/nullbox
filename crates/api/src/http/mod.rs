@@ -2,6 +2,7 @@
 
 mod admin;
 mod customer;
+mod auth;
 pub mod extract;
 mod utility;
 mod worker;
@@ -17,17 +18,26 @@ use extract::{ACTOR_HEADER, TICKET_TOKEN_HEADER};
 
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
+        // authentication
+        .route("/auth/register", post(auth::register))
+        .route("/auth/login", post(auth::login))
+        .route("/auth/me", get(auth::me))
+        .route("/auth/logout", post(auth::logout))
+
         // customers
         .route("/tickets", post(customer::create_ticket).get(worker::list_tickets))
         .route("/public/tickets/{id}", get(customer::get_ticket))
         .route("/public/tickets/{id}/messages", post(customer::reply))
+
         // workers
         .route("/tickets/{id}", get(worker::get_ticket).patch(worker::update_ticket))
         .route("/tickets/{id}/messages", post(worker::add_message))
         .route("/tickets/{id}/yeet", post(worker::yeet_ticket))
         .route("/stats/backlog", get(worker::backlog_stats))
+
         // admin
         .route("/admin/export", get(admin::export))
+
         // utility
         .route("/healthz", get(utility::healthz))
         .route("/teapot", get(utility::teapot));
@@ -70,4 +80,5 @@ fn cors(config: &Config) -> CorsLayer {
             HeaderName::from_static(ACTOR_HEADER),
             HeaderName::from_static(TICKET_TOKEN_HEADER),
         ])
+        .allow_credentials(true)
 }

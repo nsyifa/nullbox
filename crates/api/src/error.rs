@@ -22,6 +22,8 @@ pub enum ErrorCode {
     ServiceUnavailable,
     Internal,
     ImATeapot,
+    Unauthorized,
+    InvalidCredentials,
 }
 
 /// The one error shape: `{ code, message }`. `message` is English and for developers only.
@@ -56,6 +58,11 @@ pub enum ApiError {
     WorksOnMyMachine(String),
     #[error("I'm a teapot")]
     Teapot,
+    #[error("authentication required")]
+    Unauthorized,
+
+    #[error("invalid username or password")]
+    InvalidCredentials,
 }
 
 impl ApiError {
@@ -71,19 +78,25 @@ impl ApiError {
             Self::ProbablyDns(_) => ErrorCode::ServiceUnavailable,
             Self::WorksOnMyMachine(_) => ErrorCode::Internal,
             Self::Teapot => ErrorCode::ImATeapot,
+            Self::Unauthorized => ErrorCode::Unauthorized,
+            Self::InvalidCredentials => ErrorCode::InvalidCredentials,
         }
     }
 
     pub fn status(&self) -> StatusCode {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
-            Self::MissingTicketToken | Self::MissingActor => StatusCode::UNAUTHORIZED,
+            // Self::MissingTicketToken | Self::MissingActor => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::InvalidTransition(_) | Self::TicketClosed => StatusCode::CONFLICT,
             Self::ProbablyDns(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::WorksOnMyMachine(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Teapot => StatusCode::IM_A_TEAPOT,
+            Self::MissingTicketToken
+            | Self::MissingActor
+            | Self::Unauthorized
+            | Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
         }
     }
 }

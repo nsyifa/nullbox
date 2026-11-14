@@ -3,9 +3,10 @@
 use axum::Json;
 use axum::extract::{FromRequest, FromRequestParts, Path, Query};
 use axum::http::request::Parts;
-use percent_encoding::percent_decode_str;
+// use percent_encoding::percent_decode_str;
 
 use crate::{ApiError, AppState};
+// use percent_encoding::percent_decode_str;
 
 pub const ACTOR_HEADER: &str = "x-actor-name";
 pub const ADMIN_TOKEN_HEADER: &str = "x-admin-token";
@@ -27,14 +28,15 @@ pub struct Actor {
 impl FromRequestParts<AppState> for Actor {
     type Rejection = ApiError;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &AppState) -> Result<Self, Self::Rejection> {
-        let raw = parts.headers.get(ACTOR_HEADER).and_then(|v| v.to_str().ok()).ok_or(ApiError::MissingActor)?;
-        let name = percent_decode_str(raw).decode_utf8().map_err(|_| ApiError::MissingActor)?;
-        let name = name.trim();
-        if name.is_empty() || name.chars().count() > 100 {
-            return Err(ApiError::MissingActor);
-        }
-        Ok(Actor { name: name.to_owned() })
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        super::auth::authenticated_actor(
+            state,
+            &parts.headers,
+        )
+        .await
     }
 }
 

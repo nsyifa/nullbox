@@ -20,7 +20,9 @@ export function ErrorMessage({ error }: { error: unknown }) {
   const code = error instanceof ApiError ? error.code : "internal";
   return (
     <p className={styles.error} role="alert">
-      {copy.errors[code]}
+      {code in copy.errors
+  ? copy.errors[code as keyof typeof copy.errors]
+  : "Authentication failed. Please log in again."}
     </p>
   );
 }

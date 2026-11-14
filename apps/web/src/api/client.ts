@@ -5,7 +5,7 @@
  *   origin (Tauri, a CDN, a different domain). No cookies, no same-origin assumptions.
  * - Auth headers are added in `authHeaders()`: that's where a bearer token goes later.
  */
-import { getActorName } from "./actor";
+// import { getActorName } from "./actor";
 import type { BacklogStats } from "./generated/BacklogStats";
 import type { CreateTicketRequest } from "./generated/CreateTicketRequest";
 import type { CreateTicketResponse } from "./generated/CreateTicketResponse";
@@ -22,7 +22,11 @@ export const API_BASE_URL: string = (
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000"
 ).replace(/\/$/, "");
 
-export type ClientErrorCode = ErrorCode | "network_error";
+export type ClientErrorCode =
+  | ErrorCode
+  | "network_error"
+  | "unauthorized"
+  | "invalid_credentials";
 
 export class ApiError extends Error {
   constructor(
@@ -36,10 +40,10 @@ export class ApiError extends Error {
 }
 
 /** Worker identity. Today an untrusted name header; tomorrow `Authorization: Bearer …`. */
-function authHeaders(): Record<string, string> {
-  // Percent-encoded so non-ASCII names (e.g. 山田) survive HTTP headers.
-  return { "X-Actor-Name": encodeURIComponent(getActorName()) };
-}
+// function authHeaders(): Record<string, string> {
+//   // Percent-encoded so non-ASCII names (e.g. 山田) survive HTTP headers.
+//   return { "X-Actor-Name": encodeURIComponent(getActorName()) };
+// }
 
 function ticketTokenHeaders(token: string): Record<string, string> {
   return { "X-Ticket-Token": token };
@@ -58,6 +62,7 @@ async function request<T>(
     res = await fetch(`${API_BASE_URL}/api${path}`, {
       method,
       headers,
+      credentials: "include",
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
   } catch (err) {
@@ -68,10 +73,35 @@ async function request<T>(
     const error = (await res.json().catch(() => null)) as ErrorBody | null;
     throw new ApiError(error?.code ?? "internal", res.status, error?.message ?? res.statusText);
   }
-  return (await res.json()) as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  display_name: string;
+}
+
+export interface AuthCredentials {
+  username: string;
+  password: string;
 }
 
 export const api = {
+  // authentication
+  register: (body: AuthCredentials) =>
+    request<AuthUser>("POST", "/auth/register", { body }),
+
+  login: (body: AuthCredentials) =>
+    request<AuthUser>("POST", "/auth/login", { body }),
+
+  me: () =>
+    request<AuthUser>("GET", "/auth/me"),
+
+  logout: () =>
+    request<void>("POST", "/auth/logout"),
+
   // customers
   createTicket: (body: CreateTicketRequest) =>
     request<CreateTicketResponse>("POST", "/tickets", { body }),
@@ -85,17 +115,21 @@ export const api = {
 
   // workers
   listTickets: (status?: TicketStatus) =>
-    request<Ticket[]>("GET", status ? `/tickets?status=${status}` : "/tickets", {
-      headers: authHeaders(),
-    }),
+    request<Ticket[]>("GET", status ? `/tickets?status=${status}` : "/tickets"),
+
   getTicket: (id: string) =>
-    request<TicketThread>("GET", `/tickets/${id}`, { headers: authHeaders() }),
+    request<TicketThread>("GET", `/tickets/${id}`),
+
   addMessage: (id: string, body: WorkerMessageRequest) =>
-    request<Message>("POST", `/tickets/${id}/messages`, { body, headers: authHeaders() }),
+    request<Message>("POST", `/tickets/${id}/messages`, { body }),
+
   updateTicket: (id: string, body: UpdateTicketRequest) =>
-    request<Ticket>("PATCH", `/tickets/${id}`, { body, headers: authHeaders() }),
-  /** Yeet = close (status becomes `resolved`). */
+    request<Ticket>("PATCH", `/tickets/${id}`, { body }),
+
+  /** Yeet = close (status becomes resolved). */
   yeetTicket: (id: string) =>
-    request<Ticket>("POST", `/tickets/${id}/yeet`, { headers: authHeaders() }),
-  backlogStats: () => request<BacklogStats>("GET", "/stats/backlog", { headers: authHeaders() }),
+    request<Ticket>("POST", `/tickets/${id}/yeet`),
+
+  backlogStats: () =>
+    request<BacklogStats>("GET", "/stats/backlog"),
 };
