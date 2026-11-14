@@ -1,0 +1,20 @@
+{
+  "specVersion": "1.0",
+  "entries": [
+    {
+      "identifier": "urn:air:team-08.fasthacks.cloud:nullbox:ticket-api",
+      "displayName": "Nullbox ticket API",
+      "type": "application/openapi+json",
+      "url": "https://team-08.fasthacks.cloud/openapi.json",
+      "description": "Create and follow support tickets on Nullbox, a small ticketing system.",
+      "version": "1.0.0",
+      "tags": ["support", "ticketing"],
+      "representativeQueries": [
+        "file a support ticket",
+        "report a problem to the support team",
+        "check the status of my support ticket",
+        "reply to my support ticket"
+      ]
+    }
+  ]
+}
