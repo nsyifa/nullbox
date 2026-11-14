@@ -2,6 +2,7 @@
 
 mod admin;
 mod customer;
+mod mcp;
 pub mod extract;
 mod utility;
 mod worker;
@@ -38,7 +39,9 @@ pub fn router(state: AppState) -> Router {
         .route("/teapot", get(utility::teapot));
 
     let config = state.config.clone();
-    middleware(Router::new().nest("/api", api).fallback(utility::not_found), &config).with_state(state)
+    let mcp = Router::new().route("/mcp", post(mcp::post).get(mcp::get).delete(mcp::delete));
+
+    middleware(Router::new().nest("/api", api).merge(mcp).fallback(utility::not_found), &config).with_state(state)
 }
 
 /// The one place for cross-cutting layers. Tracing exporters, rate limiting,
@@ -81,7 +84,7 @@ fn cors(config: &Config) -> CorsLayer {
         .collect();
     CorsLayer::new()
         .allow_origin(AllowOrigin::list(origins))
-        .allow_methods([Method::GET, Method::POST, Method::PATCH])
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
         .allow_headers([
             header::CONTENT_TYPE,
             header::AUTHORIZATION,
@@ -89,5 +92,8 @@ fn cors(config: &Config) -> CorsLayer {
             HeaderName::from_static(TICKET_TOKEN_HEADER),
             HeaderName::from_static("traceparent"),
             HeaderName::from_static("tracestate"),
+            HeaderName::from_static("mcp-session-id"),
+            HeaderName::from_static("mcp-protocol-version"),
         ])
+        .expose_headers([HeaderName::from_static("mcp-session-id")])
 }

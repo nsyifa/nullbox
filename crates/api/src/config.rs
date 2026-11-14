@@ -13,6 +13,8 @@ pub struct Config {
     pub public_web_url: String,
     /// `ADMIN_TOKEN`: unlocks `GET /api/admin/export`, the CEO's spreadsheet.
     pub admin_token: String,
+    /// `MCP_TOKEN`: bearer token for the MCP server at `/mcp`. Unset means `/mcp` refuses everyone.
+    pub mcp_token: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +42,7 @@ impl Config {
                 .collect(),
             public_web_url: var("PUBLIC_WEB_URL", "http://localhost:5173").trim_end_matches('/').to_owned(),
             admin_token: require_admin_token(std::env::var("ADMIN_TOKEN").ok())?,
+            mcp_token: std::env::var("MCP_TOKEN").ok().map(|t| t.trim().to_owned()).filter(|t| !t.is_empty()),
         })
     }
 }

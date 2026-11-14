@@ -17,6 +17,7 @@ async fn app() -> Router {
         cors_allowed_origins: vec!["http://localhost:5173".into()],
         public_web_url: "http://localhost:5173".into(),
         admin_token: "test-admin-token".into(),
+        mcp_token: Some(MCP_TOKEN.into()),
     };
     http::router(AppState::new(pool, config))
 }
@@ -46,6 +47,7 @@ async fn send(
     (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
 }
 
+const MCP_TOKEN: &str = "test-mcp-token";
 const WORKER: (&str, &str) = ("x-actor-name", "%E5%B1%B1%E7%94%B0"); // 山田, percent-encoded
 
 #[tokio::test]
@@ -223,4 +225,33 @@ async fn customer_link_only_opens_its_own_ticket() {
         assert!(bodies.contains(&json!(format!("reply to {subject}"))));
         assert!(!bodies.contains(&json!("not my ticket")));
     }
+}
+
+#[tokio::test]
+async fn mcp_requires_bearer_and_lists_tools() {
+    let app = app().await;
+    let init = json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "test", "version": "1"}
+    }});
+
+    let (status, _) = send(&app, "POST", "/mcp", &[], Some(init.clone())).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, _) = send(&app, "POST", "/mcp", &[("authorization", "Bearer nope")], Some(init.clone())).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    let auth = ("authorization", "Bearer test-mcp-token");
+    let (status, res) = send(&app, "POST", "/mcp", &[auth], Some(init)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(res["result"]["protocolVersion"], "2025-11-25");
+
+    let (status, _) =
+        send(&app, "POST", "/mcp", &[auth], Some(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}))).await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+
+    let (_, res) = send(&app, "POST", "/mcp", &[auth], Some(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}))).await;
+    assert!(!res["result"]["tools"].as_array().unwrap().is_empty());
+
+    let call = json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "list_tickets", "arguments": {}}});
+    let (_, res) = send(&app, "POST", "/mcp", &[auth], Some(call)).await;
+    assert_eq!(res["result"]["isError"], false);
 }
