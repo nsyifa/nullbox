@@ -39,8 +39,45 @@ impl Config {
                 .filter(|origin| !origin.is_empty())
                 .collect(),
             public_web_url: var("PUBLIC_WEB_URL", "http://localhost:5173").trim_end_matches('/').to_owned(),
-            // TODO(kenji): this default is only here so the export keeps working on the demo box. Remove before launch.
-            admin_token: var("ADMIN_TOKEN", "REDACTED-ROTATED-NBX-SEC-02"),
+            admin_token: require_admin_token(std::env::var("ADMIN_TOKEN").ok())?,
         })
+    }
+}
+
+/// `ADMIN_TOKEN` has no default: a missing or blank value is a startup error.
+fn require_admin_token(value: Option<String>) -> Result<String, ConfigError> {
+    match value {
+        Some(token) if !token.trim().is_empty() => Ok(token),
+        Some(_) => Err(ConfigError { name: "ADMIN_TOKEN", reason: "must not be blank".to_owned() }),
+        None => Err(ConfigError {
+            name: "ADMIN_TOKEN",
+            reason: "is required; set it in the server environment".to_owned(),
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn admin_token_missing_is_rejected() {
+        let err = require_admin_token(None).unwrap_err();
+        assert_eq!(err.name, "ADMIN_TOKEN");
+        assert!(err.reason.contains("required"));
+    }
+
+    #[test]
+    fn admin_token_blank_is_rejected() {
+        for blank in ["", "   ", "\t\n"] {
+            let err = require_admin_token(Some(blank.to_owned())).unwrap_err();
+            assert_eq!(err.name, "ADMIN_TOKEN");
+            assert!(err.reason.contains("blank"));
+        }
+    }
+
+    #[test]
+    fn admin_token_valid_is_accepted() {
+        assert_eq!(require_admin_token(Some("test-token".to_owned())).unwrap(), "test-token");
     }
 }
