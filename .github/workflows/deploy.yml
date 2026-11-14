@@ -55,4 +55,4 @@ jobs:
           rsync -az --delete apps/web/dist/ team-08:/opt/nullbox/web/
 
       - name: Restart API
-        run: ssh team-08 "sudo systemctl restart nullbox-api"s
+        run: ssh team-08 "sudo systemctl restart nullbox-api"
