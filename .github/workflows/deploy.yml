@@ -30,7 +30,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
         env:
-          VITE_API_URL: https://team-08.fasthacks.cloud # use the variable name from apps/web/.env.example
+          VITE_API_URL: "" # use the variable name from apps/web/.env.example
 
       - name: Set up SSH
         env:
