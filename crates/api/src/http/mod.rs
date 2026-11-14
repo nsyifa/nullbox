@@ -15,6 +15,11 @@ use tower_http::trace::TraceLayer;
 use crate::{AppState, Config};
 use extract::{ACTOR_HEADER, TICKET_TOKEN_HEADER};
 
+use axum::body::Body;
+use opentelemetry::global;
+use opentelemetry_http::HeaderExtractor;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
         // customers
@@ -42,7 +47,20 @@ pub fn router(state: AppState) -> Router {
 /// Routes outside `/api` (an MCP server at `/mcp`, say) go next to the `nest` in
 /// `router`, so they pass through here too.
 pub fn middleware<S: Clone + Send + Sync + 'static>(router: Router<S>, config: &Config) -> Router<S> {
-    router.layer(cors(config)).layer(TraceLayer::new_for_http())
+    let trace = TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<Body>| {
+        let span = tracing::info_span!(
+            "http.request",
+            http.request.method = %req.method(),
+            url.path = %req.uri().path(),
+            // raw header, searchable even if propagation breaks
+            http.traceparent = req.headers().get("traceparent").and_then(|v| v.to_str().ok()),
+        );
+        // Join the caller's trace if it sent a W3C `traceparent` header
+        let parent = global::get_text_map_propagator(|p| p.extract(&HeaderExtractor(req.headers())));
+        let _ = span.set_parent(parent);
+        span
+    });
+    router.layer(cors(config)).layer(trace)
 }
 
 /// CORS for the web app on another origin (Vite in dev, Tauri). `Authorization` is
@@ -69,5 +87,7 @@ fn cors(config: &Config) -> CorsLayer {
             header::AUTHORIZATION,
             HeaderName::from_static(ACTOR_HEADER),
             HeaderName::from_static(TICKET_TOKEN_HEADER),
+            HeaderName::from_static("traceparent"),
+            HeaderName::from_static("tracestate"),
         ])
 }
