@@ -30,7 +30,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
         env:
-          VITE_API_URL: "" # use the variable name from apps/web/.env.example
+          VITE_API_BASE_URL: https://team-08.fasthacks.cloud
 
       - name: Set up SSH
         env:
@@ -55,4 +55,4 @@ jobs:
           rsync -az --delete apps/web/dist/ team-08:/opt/nullbox/web/
 
       - name: Restart API
-        run: ssh team-08 "sudo systemctl restart nullbox-api"
+        run: ssh team-08 "sudo systemctl restart nullbox-api && systemctl is-active --quiet nullbox-api && curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 1 http://127.0.0.1:3000/api/healthz"
