@@ -1,0 +1,12 @@
+# Nullbox
+
+> Nullbox is a small, silly support ticketing system. Customers report problems, workers answer them, and everyone works toward Inbox Zero.
+
+## Pages
+
+- [Report a problem](https://team-08.fasthacks.cloud/): file a support ticket, with or without a name
+
+## For agents
+
+- [API description (OpenAPI)](https://team-08.fasthacks.cloud/openapi.json): the public ticket endpoints
+- [ARD manifest](https://team-08.fasthacks.cloud/.well-known/ard.json): machine-readable discovery of Nullbox resources

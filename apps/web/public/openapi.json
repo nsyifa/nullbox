@@ -1,0 +1,86 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Nullbox API", "version": "1.0.0" },
+  "servers": [{ "url": "https://team-08.fasthacks.cloud" }],
+  "paths": {
+    "/api/tickets": {
+      "post": {
+        "summary": "Create a ticket",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["subject", "body", "severity"],
+                "properties": {
+                  "subject": { "type": "string", "maxLength": 200 },
+                  "body": { "type": "string", "maxLength": 20000 },
+                  "severity": {
+                    "type": "string",
+                    "description": "Severity level, for example P1"
+                  },
+                  "customer_name": { "type": "string", "maxLength": 100 },
+                  "customer_email": { "type": "string", "maxLength": 254 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Returns the ticket, an access_token and an access_link"
+          }
+        }
+      }
+    },
+    "/api/public/tickets/{id}": {
+      "get": {
+        "summary": "Customer view of a ticket",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "X-Ticket-Token",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "The ticket and its public messages" }
+        }
+      }
+    },
+    "/api/public/tickets/{id}/messages": {
+      "post": {
+        "summary": "Reply to a ticket",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "X-Ticket-Token",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "2XX": { "description": "The reply was added" } }
+      }
+    },
+    "/api/healthz": {
+      "get": {
+        "summary": "Liveness check",
+        "responses": { "200": { "description": "The API is up" } }
+      }
+    }
+  }
+}
