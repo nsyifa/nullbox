@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04 # older glibc, so the binary also runs on older Ubuntu servers
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - run: corepack enable
+
+      # Tests also regenerate apps/web/src/api/generated, which the web build needs
+      - run: cargo test
+        env:
+          SQLX_OFFLINE: "true"
+      - run: cargo build --release -p nullbox-api
+        env:
+          SQLX_OFFLINE: "true"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          VITE_API_URL: https://team-08.fasthacks.cloud # use the variable name from apps/web/.env.example
+
+      - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host team-08
+            HostName ${{ secrets.SSH_HOST }}
+            User ${{ secrets.SSH_USER }}
+            Port ${{ secrets.SSH_PORT }}
+            IdentityFile ~/.ssh/id_ed25519
+          EOF
+
+      - name: Upload
+        run: |
+          rsync -az target/release/nullbox-api team-08:/opt/nullbox/bin/
+          rsync -az --delete apps/web/dist/ team-08:/opt/nullbox/web/
+
+      - name: Restart API
+        run: ssh team-08 "sudo systemctl restart nullbox-api"s
